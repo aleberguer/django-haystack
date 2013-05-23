@@ -196,6 +196,22 @@ class LocationField(SearchField):
         return value
 
 
+class PolygonField(SearchField):
+    field_type = 'polygon'
+
+    def prepare(self, obj):
+        value = super(PolygonField, self).prepare(obj)
+
+        # TODO: Validate data!
+
+        return value
+
+        #return "-74.093 41.042 -69.347 44.558"
+
+    def convert(self, value):
+        return value
+
+
 class NgramField(CharField):
     field_type = 'ngram'
 

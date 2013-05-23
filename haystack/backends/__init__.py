@@ -122,8 +122,9 @@ class BaseSearchBackend(object):
                             fields='', highlight=False, facets=None,
                             date_facets=None, query_facets=None,
                             narrow_queries=None, spelling_query=None,
-                            within=None, dwithin=None, distance_point=None,
-                            models=None, limit_to_registered_models=None,
+                            within=None, dwithin=None,
+                            distance_point=None, contains=None, models=None,
+                            limit_to_registered_models=None,
                             result_class=None):
         # A convenience method most backends should include in order to make
         # extension easier.
@@ -304,6 +305,7 @@ class BaseSearchQuery(object):
         self.within = {}
         self.dwithin = {}
         self.distance_point = {}
+        self.contains = {}
         # Internal.
         self._raw_query = None
         self._raw_query_params = {}
@@ -380,6 +382,9 @@ class BaseSearchQuery(object):
 
         if self.distance_point:
             kwargs['distance_point'] = self.distance_point
+
+        if self.contains:
+            kwargs['contains'] = self.contains
 
         if self.result_class:
             kwargs['result_class'] = self.result_class
@@ -742,6 +747,13 @@ class BaseSearchQuery(object):
             'point': ensure_point(point),
         }
 
+    def add_contains(self, field, point):
+        """Adds point-in-polygon filter for Solr 4.3+"""
+        self.contains = {
+            'field': field,
+            'point': point
+        }
+
     def add_field_facet(self, field, **options):
         """Adds a regular facet on a field."""
         from haystack import connections
@@ -853,6 +865,7 @@ class BaseSearchQuery(object):
         clone.within = self.within.copy()
         clone.dwithin = self.dwithin.copy()
         clone.distance_point = self.distance_point.copy()
+        clone.contains = self.contains.copy()
         clone._raw_query = self._raw_query
         clone._raw_query_params = self._raw_query_params
 

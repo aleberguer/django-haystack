@@ -135,6 +135,7 @@ class SolrSearchBackend(BaseSearchBackend):
                             date_facets=None, query_facets=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
+                            contains=None,
                             models=None, limit_to_registered_models=None,
                             result_class=None, stats=None):
         kwargs = {'fl': '* score'}
@@ -253,6 +254,12 @@ class SolrSearchBackend(BaseSearchBackend):
             kwargs.setdefault('fq', [])
             lng, lat = dwithin['point'].get_coords()
             geofilt = '{!geofilt pt=%s,%s sfield=%s d=%s}' % (lat, lng, dwithin['field'], dwithin['distance'].km)
+            kwargs['fq'].append(geofilt)
+
+        if contains is not None:
+            kwargs.setdefault('fq', [])
+            lng, lat = contains['point'].get_coords()
+            geofilt = 'bounds:"Contains(%s,%s)"' % (lat, lng)
             kwargs['fq'].append(geofilt)
 
         # Check to see if the backend should try to include distances
@@ -442,6 +449,8 @@ class SolrSearchBackend(BaseSearchBackend):
                 field_data['type'] = 'edge_ngram'
             elif field_class.field_type == 'location':
                 field_data['type'] = 'location'
+            elif field_class.field_type == 'polygon':
+                field_data['type'] = 'geohash_polygon'
 
             if field_class.is_multivalued:
                 field_data['multi_valued'] = 'true'
@@ -650,6 +659,9 @@ class SolrSearchQuery(BaseSearchQuery):
 
         if self.dwithin:
             search_kwargs['dwithin'] = self.dwithin
+
+        if self.contains:
+            search_kwargs['contains'] = self.contains
 
         if self.end_offset is not None:
             search_kwargs['end_offset'] = self.end_offset
