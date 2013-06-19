@@ -311,7 +311,7 @@ amount of time between gaps as ``gap_by`` (one of ``'year'``, ``'month'``,
 
 You can also optionally provide a ``gap_amount`` to specify a different
 increment than ``1``. For example, specifying gaps by week (every seven days)
-would would be ``gap_by='day', gap_amount=7``).
+would be ``gap_by='day', gap_amount=7``).
 
 In the search results you get back, facet counts will be populated in the
 ``SearchResult`` object. You can access them via the ``facet_counts`` method.
@@ -544,7 +544,7 @@ for similar results. The instance you pass in should be an indexed object.
 Previously called methods will have an effect on the provided results.
 
 It will evaluate its own backend-specific query and populate the
-`SearchQuerySet`` in the same manner as other methods.
+``SearchQuerySet`` in the same manner as other methods.
 
 Example::
 
@@ -717,7 +717,8 @@ Example::
 Returns the spelling suggestion found by the query.
 
 To work, you must set ``INCLUDE_SPELLING`` within your connection's
-settings dictionary to ``True``. Otherwise, ``None`` will be returned.
+settings dictionary to ``True``, and you must rebuild your index afterwards. 
+Otherwise, ``None`` will be returned.
 
 This method causes the query to evaluate and run the search if it hasn't already
 run. Search results will be populated as normal but with an additional spelling

@@ -167,7 +167,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 # We'll log the object identifier but won't include the actual object
                 # to avoid the possibility of that generating encoding errors while
                 # processing the log message:
-                self.log.error(u"%s while preparing object for update" % e.__name__, exc_info=True, extra={
+                self.log.error(u"%s while preparing object for update" % e.__class__.__name__, exc_info=True, extra={
                     "data": {
                         "index": index,
                         "object": get_identifier(obj)
@@ -212,6 +212,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
         try:
             if not models:
                 self.conn.delete_index(self.index_name)
+                self.setup_complete = False
+                self.existing_mapping = {}
             else:
                 models_to_delete = []
 
