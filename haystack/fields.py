@@ -212,6 +212,10 @@ class PolygonField(SearchField):
         return value
 
 
+class EnvelopeField(SearchField):
+    field_type = 'envelope'
+
+
 class NgramField(CharField):
     field_type = 'ngram'
 

@@ -238,6 +238,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                             date_facets=None, query_facets=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
+                            contains=None,
                             models=None, limit_to_registered_models=None,
                             result_class=None):
         index = haystack.connections[self.connection_alias].get_unified_index()
@@ -669,6 +670,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 field_mapping['analyzer'] = "edgengram_analyzer"
             elif field_class.field_type == 'location':
                 field_mapping['type'] = 'geo_point'
+            elif field_class.field_type == 'envelope':
+                field_mapping['type'] = 'envelope'
 
             # The docs claim nothing is needed for multivalue...
             # if field_class.is_multivalued:
