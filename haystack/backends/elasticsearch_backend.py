@@ -474,6 +474,33 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
             else:
                 kwargs['query']['filtered']['filter'] = dwithin_filter
 
+        if contains is not None:
+            contains_filter = {
+                "geo_shape": {
+                    contains['field']: {
+                        "shape": {
+                            "type": "Point",
+                            "coordinates": [
+                                contains['point'][0],
+                                contains['point'][1]
+                            ]
+                        }
+                    }
+                }
+            }
+            kwargs['query'].setdefault('filtered', {})
+            kwargs['query']['filtered'].setdefault('filter', {})
+            if kwargs['query']['filtered']['filter']:
+                compound_filter = {
+                    "and": [
+                        kwargs['query']['filtered']['filter'],
+                        contains_filter
+                    ]
+                }
+                kwargs['query']['filtered']['filter'] = compound_filter
+            else:
+                kwargs['query']['filtered']['filter'] = contains_filter
+
         # Remove the "filtered" key if we're not filtering. Otherwise,
         # Elasticsearch will blow up.
         if not kwargs['query']['filtered'].get('filter'):
@@ -671,7 +698,9 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
             elif field_class.field_type == 'location':
                 field_mapping['type'] = 'geo_point'
             elif field_class.field_type == 'envelope':
-                field_mapping['type'] = 'envelope'
+                field_mapping['type'] = 'geo_shape'
+                field_mapping['tree'] = 'quadtree'
+                field_mapping['precision'] = '1m'
 
             # The docs claim nothing is needed for multivalue...
             # if field_class.is_multivalued:
@@ -934,6 +963,9 @@ class ElasticsearchSearchQuery(BaseSearchQuery):
 
         if self.within:
             search_kwargs['within'] = self.within
+
+        if self.contains:
+            search_kwargs['contains'] = self.contains
 
         if spelling_query:
             search_kwargs['spelling_query'] = spelling_query
