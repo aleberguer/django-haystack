@@ -17,6 +17,10 @@ class BaseInput(object):
     def __repr__(self):
         return u"<%s '%s'>" % (self.__class__.__name__, self.__unicode__().encode('utf8'))
 
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and
+                self.query_string == other.query_string)
+
     def __unicode__(self):
         return force_unicode(self.query_string)
 
