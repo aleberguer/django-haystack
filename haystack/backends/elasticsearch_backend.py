@@ -174,10 +174,14 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                     }
                 })
 
-        self.conn.bulk_index(self.index_name, 'modelresult', prepped_docs, id_field=ID)
+        if len(prepped_docs) > 0:
+            self.conn.bulk_index(self.index_name,
+                                 'modelresult',
+                                 prepped_docs,
+                                 id_field=ID)
 
-        if commit:
-            self.conn.refresh(index=self.index_name)
+            if commit:
+                self.conn.refresh(index=self.index_name)
 
     def remove(self, obj_or_string, commit=True):
         doc_id = get_identifier(obj_or_string)
