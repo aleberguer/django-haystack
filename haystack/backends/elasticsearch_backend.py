@@ -748,6 +748,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
             return unicode(value, errors='replace')  # TODO: Be stricter.
         elif isinstance(value, set):
             return list(value)
+        elif isinstance(value, bool):
+            return str(value).lower()
         return value
 
     def _to_python(self, value):
