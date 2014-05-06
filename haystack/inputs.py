@@ -1,8 +1,16 @@
+from __future__ import unicode_literals
 import re
 import warnings
-from django.utils.encoding import force_unicode
+
+from django.utils.encoding import python_2_unicode_compatible
+
+try:
+    from django.utils.encoding import force_text
+except ImportError:
+    from django.utils.encoding import force_unicode as force_text
 
 
+@python_2_unicode_compatible
 class BaseInput(object):
     """
     The base input type. Doesn't do much. You want ``Raw`` instead.
@@ -20,9 +28,9 @@ class BaseInput(object):
     def __eq__(self, other):
         return (self.__class__ == other.__class__ and
                 self.query_string == other.query_string)
-
-    def __unicode__(self):
-        return force_unicode(self.query_string)
+                
+    def __str__(self):
+        return force_text(self.query_string)
 
     def prepare(self, query_obj):
         return self.query_string
