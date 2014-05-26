@@ -211,7 +211,7 @@ class SearchQuerySet(object):
                     objects = index.read_queryset(using=self.query._using)
                     loaded_objects[model] = objects.in_bulk(models_pks[model])
                 except NotHandled:
-                    self.log.warning("Model '%s.%s' not handled by the routers.", self.app_label, self.model_name)
+                    self.log.warning("Model '%s' not handled by the routers", model)
                     # Revert to old behaviour
                     loaded_objects[model] = model._default_manager.in_bulk(models_pks[model])
 
@@ -337,7 +337,7 @@ class SearchQuerySet(object):
 
         for model in models:
             if not model in connections[self.query._using].get_unified_index().get_indexed_models():
-                warnings.warn('The model %r is not registered for search.' % model)
+                warnings.warn('The model %r is not registered for search.' % (model,))
 
             clone.query.add_model(model)
 
@@ -461,10 +461,11 @@ class SearchQuerySet(object):
         for field_name, query in kwargs.items():
             for word in query.split(' '):
                 bit = clone.query.clean(word.strip())
-                kwargs = {
-                    field_name: bit,
-                }
-                query_bits.append(SQ(**kwargs))
+                if bit:
+                    kwargs = {
+                        field_name: bit,
+                    }
+                    query_bits.append(SQ(**kwargs))
 
         return clone.filter(six.moves.reduce(operator.__and__, query_bits))
 
