@@ -1,5 +1,6 @@
 import copy
 import inspect
+import threading
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.datastructures import SortedDict
@@ -77,6 +78,10 @@ def load_router(full_router_path):
     return import_class(full_router_path)
 
 
+# Lock to make sure different threads don't create two connections. An RLock
+# allows a thread to reenter its lock, hence reload can call __getitem__.
+conn_lock = threading.RLock()
+
 class ConnectionHandler(object):
     def __init__(self, connections_info):
         self.connections_info = connections_info
@@ -93,20 +98,22 @@ class ConnectionHandler(object):
             conn['ENGINE'] = 'haystack.backends.simple_backend.SimpleEngine'
 
     def __getitem__(self, key):
-        if key in self._connections:
+        with conn_lock:
+            if key in self._connections:
+                return self._connections[key]
+
+            self.ensure_defaults(key)
+            self._connections[key] = load_backend(self.connections_info[key]['ENGINE'])(using=key)
             return self._connections[key]
 
-        self.ensure_defaults(key)
-        self._connections[key] = load_backend(self.connections_info[key]['ENGINE'])(using=key)
-        return self._connections[key]
-
     def reload(self, key):
-        try:
-            del self._connections[key]
-        except KeyError:
-            pass
+        with conn_lock:
+            try:
+                del self._connections[key]
+            except KeyError:
+                pass
 
-        return self.__getitem__(key)
+            return self.__getitem__(key)
 
     def all(self):
         return [self[alias] for alias in self.connections_info]
