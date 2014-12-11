@@ -729,6 +729,9 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 if not hasattr(field_class, 'facet_for') and not field_class.field_type in('ngram', 'edge_ngram'):
                     field_mapping["analyzer"] = "snowball"
 
+            if field_class.field_type == 'no_index_string':
+                field_mapping['index'] = 'no'
+
             mapping[field_class.index_fieldname] = field_mapping
 
         return (content_field_name, mapping)

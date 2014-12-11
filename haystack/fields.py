@@ -218,6 +218,10 @@ class EnvelopeField(SearchField):
     field_type = 'envelope'
 
 
+class NoIndexCharField(CharField):
+    field_type = 'no_index_string'
+
+
 class NgramField(CharField):
     field_type = 'ngram'
 
