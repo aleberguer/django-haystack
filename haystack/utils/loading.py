@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import copy
 import inspect
+import warnings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.datastructures import SortedDict
@@ -158,7 +159,11 @@ class UnifiedIndex(object):
         indexes = []
 
         for app in settings.INSTALLED_APPS:
-            mod = importlib.import_module(app)
+            try:
+                mod = importlib.import_module(app)
+            except ImportError:
+                warnings.warn('Installed app %s is not an importable Python module and will be ignored' % app)
+                continue
 
             try:
                 search_index_module = importlib.import_module("%s.search_indexes" % app)
@@ -198,7 +203,13 @@ class UnifiedIndex(object):
             model = index.get_model()
 
             if model in self.indexes:
-                raise ImproperlyConfigured("Model '%s' has more than one 'SearchIndex`` handling it. Please exclude either '%s' or '%s' using the 'HAYSTACK_EXCLUDED_INDEXES' setting." % (model, self.indexes[model], index))
+                raise ImproperlyConfigured(
+                    "Model '%s' has more than one 'SearchIndex`` handling it. "
+                    "Please exclude either '%s' or '%s' using the 'EXCLUDED_INDEXES' "
+                    "setting defined in 'settings.HAYSTACK_CONNECTIONS'." % (
+                        model, self.indexes[model], index
+                    )
+                )
 
             self.indexes[model] = index
             self.collect_fields(index)

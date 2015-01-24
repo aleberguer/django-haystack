@@ -1,18 +1,18 @@
-from __future__ import print_function
-from __future__ import unicode_literals
-from datetime import timedelta
-from optparse import make_option
+# encoding: utf-8
+from __future__ import absolute_import, print_function, unicode_literals
+
 import logging
 import os
+from datetime import timedelta
+from optparse import make_option
 
 from django import db
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import LabelCommand
 from django.db import reset_queries
 
 from haystack import connections as haystack_connections
 from haystack.query import SearchQuerySet
+from haystack.utils.app_loading import get_models, load_apps
 
 try:
     from django.utils.encoding import force_text
@@ -45,7 +45,7 @@ def worker(bits):
     for alias, info in connections.databases.items():
         # We need to also tread lightly with SQLite, because blindly wiping
         # out connections (via ``... = {}``) destroys in-memory DBs.
-        if not 'sqlite3' in info['ENGINE']:
+        if 'sqlite3' not in info['ENGINE']:
             try:
                 db.close_connection()
                 if isinstance(connections._connections, dict):
@@ -96,7 +96,7 @@ def do_remove(backend, index, model, pks_seen, start, upper_bound, verbosity=1):
     # Fetch a list of results.
     # Can't do pk range, because id's are strings (thanks comments
     # & UUIDs!).
-    stuff_in_the_index = SearchQuerySet().models(model)[start:upper_bound]
+    stuff_in_the_index = SearchQuerySet(using=backend.connection_alias).models(model)[start:upper_bound]
 
     # Iterate over those results.
     for result in stuff_in_the_index:
@@ -179,41 +179,9 @@ class Command(LabelCommand):
                 pass
 
         if not items:
-            from django.db.models import get_app
-            # Do all, in an INSTALLED_APPS sorted order.
-            items = []
-
-            for app in settings.INSTALLED_APPS:
-                try:
-                    app_label = app.split('.')[-1]
-                    loaded_app = get_app(app_label)
-                    items.append(app_label)
-                except:
-                    # No models, no problem.
-                    pass
+            items = load_apps()
 
         return super(Command, self).handle(*items, **options)
-
-    def is_app_or_model(self, label):
-        label_bits = label.split('.')
-
-        if len(label_bits) == 1:
-            return APP
-        elif len(label_bits) == 2:
-            return MODEL
-        else:
-            raise ImproperlyConfigured("'%s' isn't recognized as an app (<app_label>) or model (<app_label>.<model_name>)." % label)
-
-    def get_models(self, label):
-        from django.db.models import get_app, get_models, get_model
-        app_or_model = self.is_app_or_model(label)
-
-        if app_or_model == APP:
-            app_mod = get_app(label)
-            return get_models(app_mod)
-        else:
-            app_label, model_name = label.split('.')
-            return [get_model(app_label, model_name)]
 
     def handle_label(self, label, **options):
         for using in self.backends:
@@ -232,7 +200,7 @@ class Command(LabelCommand):
         if self.workers > 0:
             import multiprocessing
 
-        for model in self.get_models(label):
+        for model in get_models(label):
             try:
                 index = unified_index.get_index(model)
             except NotHandled:
@@ -254,7 +222,6 @@ class Command(LabelCommand):
             if self.verbosity >= 1:
                 print(u"Indexing %d %s" % (total, force_text(model._meta.verbose_name_plural)))
 
-            pks_seen = set([smart_bytes(pk) for pk in qs.values_list('pk', flat=True)])
             batch_size = self.batchsize or backend.batch_size
 
             if self.workers > 0:
@@ -278,8 +245,11 @@ class Command(LabelCommand):
                     # They're using a reduced set, which may not incorporate
                     # all pks. Rebuild the list with everything.
                     qs = index.index_queryset().values_list('pk', flat=True)
-                    pks_seen = set([smart_bytes(pk) for pk in qs])
+                    pks_seen = set(smart_bytes(pk) for pk in qs)
+
                     total = len(pks_seen)
+                else:
+                    pks_seen = set(smart_bytes(pk) for pk in qs.values_list('pk', flat=True))
 
                 if self.workers > 0:
                     ghetto_queue = []
