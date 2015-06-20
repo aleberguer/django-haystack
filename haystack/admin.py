@@ -70,6 +70,9 @@ class SearchModelAdminMixin(object):
     # haystack connection to use for searching
     haystack_connection = 'default'
 
+    def get_changelist(self, request, **kwargs):
+        return SearchChangeList
+
     @csrf_protect_m
     def changelist_view(self, request, extra_context=None):
         if not self.has_change_permission(request, None):
@@ -109,6 +112,7 @@ class SearchModelAdminMixin(object):
         if hasattr(self, 'list_max_show_all'):
             kwargs['list_max_show_all'] = self.list_max_show_all
 
+        SearchChangeList = self.get_changelist(**kwargs)
         changelist = SearchChangeList(**kwargs)
         formset = changelist.formset = None
         media = self.media
