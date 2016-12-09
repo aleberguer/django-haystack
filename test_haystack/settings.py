@@ -101,3 +101,10 @@ if os.getenv('VERSION_ES') == ">=2.0.0,<3.0.0":
         'INDEX_NAME': 'test_default',
         'INCLUDE_SPELLING': True,
     }
+elif os.getenv('VERSION_ES') == ">=5.0.0,<6.0.0":
+    HAYSTACK_CONNECTIONS['elasticsearch'] = {
+        'ENGINE': 'haystack.backends.elasticsearch5_backend.Elasticsearch5SearchEngine',
+        'URL': '127.0.0.1:9200/',
+        'INDEX_NAME': 'test_default',
+        'INCLUDE_SPELLING': True,
+    }
