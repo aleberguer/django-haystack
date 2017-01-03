@@ -165,7 +165,7 @@ class Elasticsearch5SearchBackend(ElasticsearchSearchBackend):
             }
 
         if narrow_queries is None:
-            narrow_queries = set()
+            narrow_queries = []
 
         if facets is not None:
             kwargs.setdefault('aggs', {})
@@ -239,6 +239,21 @@ class Elasticsearch5SearchBackend(ElasticsearchSearchBackend):
                         }
                     },
                 }
+
+        if limit_to_registered_models is None:
+            limit_to_registered_models = getattr(settings, 'HAYSTACK_LIMIT_TO_REGISTERED_MODELS', True)
+
+        if models and len(models):
+            model_choices = sorted(get_model_ct(model) for model in models)
+        elif limit_to_registered_models:
+            # Using narrow queries, limit the results to only models handled
+            # with the current routers.
+            model_choices = self.build_models_list()
+        else:
+            model_choices = []
+
+        if len(model_choices) > 0:
+            filters.append({"terms": {DJANGO_CT: model_choices}})
 
         for q in narrow_queries:
             filters.append({
