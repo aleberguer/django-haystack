@@ -17,7 +17,6 @@ install_requires = [
 ]
 
 tests_require = [
-    'elasticsearch>=1.0.0,<2.0.0',
     'pysolr>=3.3.2',
     'whoosh>=2.5.4,<3.0',
     'python-dateutil',
@@ -30,7 +29,7 @@ tests_require = [
 
 setup(
     name='django-haystack',
-    version='2.5.1',
+    use_scm_version=True,
     description='Pluggable search for Django.',
     author='Daniel Lindsley',
     author_email='daniel@toastdriven.com',
@@ -66,4 +65,5 @@ setup(
     install_requires=install_requires,
     tests_require=tests_require,
     test_suite="test_haystack.run_tests.run_all",
+    setup_requires=['setuptools_scm'],
 )
