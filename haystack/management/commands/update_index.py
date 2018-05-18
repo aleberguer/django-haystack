@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import LabelCommand
 from django.db import reset_queries
+from django.db.models import Max
 from django.utils.encoding import smart_str, force_unicode
 
 from haystack import connections as haystack_connections
@@ -62,11 +63,15 @@ def worker(bits):
         do_remove(backend, index, model, pks_seen, start, upper_bound, verbosity=verbosity)
 
 
-def do_update(backend, index, qs, start, end, total, verbosity=1):
+def do_update(backend, index, qs, start, end, total, verbosity=1, batch_by_id=False):
     # Get a clone of the QuerySet so that the cache doesn't bloat up
     # in memory. Useful when reindexing large amounts of data.
     small_cache_qs = qs.all()
-    current_qs = small_cache_qs[start:end]
+
+    if batch_by_id:
+        current_qs = small_cache_qs.filter(id__range=(start, end))
+    else:
+        current_qs = small_cache_qs[start:end]
 
     if verbosity >= 2:
         if hasattr(os, 'getppid') and os.getpid() == os.getppid():
@@ -129,6 +134,9 @@ class Command(LabelCommand):
             default=0, type='int',
             help='Allows for the use multiple workers to parallelize indexing. Requires multiprocessing.'
         ),
+        make_option('-bbi', '--batch-by-id', action='store_true', dest='batch_by_id',
+            default=False, help='This will change the batching to not use an offset query. It will find the max pk then batch from 0 to max using between.'
+        ),
     )
     option_list = LabelCommand.option_list + base_options
 
@@ -139,6 +147,10 @@ class Command(LabelCommand):
         self.end_date = None
         self.remove = options.get('remove', False)
         self.workers = int(options.get('workers', 0))
+        self.batch_by_id = options.get('batch_by_id', False)
+
+        if self.batch_by_id and self.batchsize < 1:
+            raise ValueError('batch_size cannot be less than 1')
 
         self.backends = options.get('using')
         if not self.backends:
@@ -212,6 +224,18 @@ class Command(LabelCommand):
                 logging.exception("Error updating %s using %s ", label, using)
                 raise
 
+    def _get_total(self, qs):
+        if self.batch_by_id:
+            return qs.aggregate(Max('id'))
+        return qs.count()
+
+    def _get_end_index(self, start, batch_size, total):
+        if self.batch_by_id:
+            # this use SQL BETWEEN clause which is inclusive so to avoid overlap need to subtract one
+            batch_size = batch_size - 1
+
+        return min(start + batch_size, total)
+
     def update_backend(self, label, using):
         from haystack.exceptions import NotHandled
 
@@ -238,7 +262,7 @@ class Command(LabelCommand):
             qs = index.build_queryset(using=using, start_date=self.start_date,
                                       end_date=self.end_date)
 
-            total = qs.count()
+            total = self._get_total(qs)
 
             if self.verbosity >= 1:
                 print u"Indexing %d %s" % (total, force_unicode(model._meta.verbose_name_plural))
@@ -250,10 +274,10 @@ class Command(LabelCommand):
                 ghetto_queue = []
 
             for start in range(0, total, batch_size):
-                end = min(start + batch_size, total)
+                end = self._get_end_index(start, batch_size, total)
 
                 if self.workers == 0:
-                    do_update(backend, index, qs, start, end, total, self.verbosity)
+                    do_update(backend, index, qs, start, end, total, self.verbosity, self.batch_by_id)
                 else:
                     ghetto_queue.append(('do_update', model, start, end, total, using, self.start_date, self.end_date, self.verbosity))
 
