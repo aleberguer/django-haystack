@@ -9,6 +9,8 @@ from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections, reset_queries
+from django.db.models import Max
+from django.db.models import Min
 from django.utils.encoding import force_text, smart_bytes
 from django.utils.timezone import now
 
@@ -62,12 +64,15 @@ def update_worker(args):
 
 
 def do_update(backend, index, qs, start, end, total, verbosity=1, commit=True,
-              max_retries=DEFAULT_MAX_RETRIES):
+              max_retries=DEFAULT_MAX_RETRIES, batch_by_id=False):
 
     # Get a clone of the QuerySet so that the cache doesn't bloat up
     # in memory. Useful when reindexing large amounts of data.
     small_cache_qs = qs.all()
-    current_qs = small_cache_qs[start:end]
+    if batch_by_id:
+        current_qs = small_cache_qs.filter(id__range=(start, end))
+    else:
+        current_qs = small_cache_qs[start:end]
 
     is_parent_process = hasattr(os, 'getppid') and os.getpid() == os.getppid()
 
@@ -164,6 +169,10 @@ class Command(BaseCommand):
             type=int, default=DEFAULT_MAX_RETRIES,
             help='Maximum number of attempts to write to the backend when an error occurs.'
         )
+        parser.add_argument(
+            '-bbi', '--batch-by-id', action='store_true', dest='batch_by_id',
+            help='This will change the batching to not use an offset query. It will find the max pk then batch from 0 to max using between.'
+        )
 
     def handle(self, **options):
         self.verbosity = int(options.get('verbosity', 1))
@@ -174,6 +183,10 @@ class Command(BaseCommand):
         self.workers = options.get('workers', 0)
         self.commit = options.get('commit', True)
         self.max_retries = options.get('max_retries', DEFAULT_MAX_RETRIES)
+        self.batch_by_id = options.get('batch_by_id', False)
+
+        if self.batch_by_id and self.batchsize < 1:
+            raise ValueError('Batchsize must be 1 or greater when batch_by_id is True')
 
         self.backends = options.get('using')
         if not self.backends:
@@ -216,6 +229,21 @@ class Command(BaseCommand):
                     LOG.exception("Error updating %s using %s ", label, using)
                     raise
 
+    def _get_start_and_total(self, qs):
+        if self.batch_by_id:
+            min_max = qs.aggregate(Max('id'), Min('id'))
+            start = min_max['id__min'] if min_max['id__min'] is not None else 0
+            total = min_max['id__max'] if min_max['id__max'] is not None else 0
+            return start, total
+        return 0, qs.count()
+
+    def _get_end_index(self, start, batch_size, total):
+        if self.batch_by_id:
+            # this use SQL BETWEEN clause which is inclusive so to avoid overlap need to subtract one
+            batch_size = batch_size - 1
+
+        return min(start + batch_size, total)
+
     def update_backend(self, label, using):
         backend = haystack_connections[using].get_backend()
         unified_index = haystack_connections[using].get_unified_index()
@@ -237,11 +265,11 @@ class Command(BaseCommand):
             qs = index.build_queryset(using=using, start_date=self.start_date,
                                       end_date=self.end_date)
 
-            total = qs.count()
+            start_index, total = self._get_start_and_total(qs)
 
             if self.verbosity >= 1:
                 self.stdout.write(u"Indexing %d %s" % (
-                    total, force_text(model._meta.verbose_name_plural))
+                    qs.count(), force_text(model._meta.verbose_name_plural))
                 )
 
             batch_size = self.batchsize or backend.batch_size
@@ -249,12 +277,12 @@ class Command(BaseCommand):
             if self.workers > 0:
                 ghetto_queue = []
 
-            for start in range(0, total, batch_size):
-                end = min(start + batch_size, total)
+            for start in range(start_index, total, batch_size):
+                end = self._get_end_index(start, batch_size, total)
 
                 if self.workers == 0:
                     do_update(backend, index, qs, start, end, total, verbosity=self.verbosity,
-                              commit=self.commit, max_retries=self.max_retries)
+                              commit=self.commit, max_retries=self.max_retries, batch_by_id=self.batch_by_id)
                 else:
                     ghetto_queue.append((model, start, end, total, using, self.start_date, self.end_date,
                                          self.verbosity, self.commit, self.max_retries))
