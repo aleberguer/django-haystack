@@ -72,7 +72,7 @@ def generate_bounding_box(bottom_left, top_right):
 
     The two-tuple is in the form ``((min_lat, min_lng), (max_lat, max_lng))``.
     """
-    west, lat_1 = bottom_left.get_coords()
-    east, lat_2 = top_right.get_coords()
+    west, lat_1 = bottom_left.coords
+    east, lat_2 = top_right.coords
     min_lat, max_lat = min(lat_1, lat_2), max(lat_1, lat_2)
     return ((min_lat, west), (max_lat, east))
