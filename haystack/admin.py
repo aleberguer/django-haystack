@@ -116,7 +116,8 @@ class SearchModelAdminMixin(object):
             'list_select_related': self.list_select_related,
             'list_per_page': self.list_per_page,
             'list_editable': self.list_editable,
-            'model_admin': self
+            'model_admin': self,
+            'sortable_by': self.sortable_by,
         }
 
         # Django 1.4 compatibility.
