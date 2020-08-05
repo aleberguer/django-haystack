@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import django
 from django.contrib.admin.options import ModelAdmin, csrf_protect_m
 from django.contrib.admin.views.main import SEARCH_VAR, ChangeList
 from django.core.exceptions import PermissionDenied
@@ -117,8 +118,10 @@ class SearchModelAdminMixin(object):
             'list_per_page': self.list_per_page,
             'list_editable': self.list_editable,
             'model_admin': self,
-            'sortable_by': self.sortable_by,
         }
+        if django.VERSION >= (2, 0):
+            kwargs['sortable_by'] = self.sortable_by
+
 
         # Django 1.4 compatibility.
         if hasattr(self, 'list_max_show_all'):
