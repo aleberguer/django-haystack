@@ -10,7 +10,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest, QueryDict
 from django.test import override_settings
 from django.test import TestCase
-from django.utils.six.moves import queue
+from six.moves import queue
 from test_haystack.core.models import AnotherMockModel, MockModel
 
 from haystack import connection_router, connections, indexes
